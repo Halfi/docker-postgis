@@ -17,7 +17,7 @@ jobs:
       matrix:
         postgres: [9.5, 9.6, 10, 11, 12, 13]
         postgis: ['2.5', '3.1']
-        variant: [default, alpine]
+        variant: [default]
         exclude:
           - postgres: 13
             postgis: '2.5'
@@ -42,12 +42,13 @@ jobs:
     env:
       VERSION: ${{ matrix.postgres }}-${{ matrix.postgis }}
       VARIANT: ${{ matrix.variant }}
+      REPO_NAME: halfi
 
     steps:
     - name: Checkout source
       uses: actions/checkout@v2
 
-    - name: Build docker image for ${{ env.VERSION }} ${{ env.VARIANT }}
+    - name: Test docker image for ${{ env.VERSION }} ${{ env.VARIANT }}
       run: make test
 
     - name: Login to dockerhub
@@ -57,11 +58,11 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
 
-    - name: Push docker image to dockerhub
+    - name: Build and push docker image to dockerhub
       if: ${{  (github.ref == 'refs/heads/master') && (github.event_name != 'pull_request')  }}
       env:
         DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
         DOCKERHUB_ACCESS_TOKEN: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
-      run: make push
+      run: make buildx
 

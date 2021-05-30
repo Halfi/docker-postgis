@@ -1,5 +1,5 @@
-testAlias[postgis/postgis]=postgres
+testAlias[halfi/postgis]=postgres
 
-imageTests[postgis/postgis]='
+imageTests[halfi/postgis]='
 	postgis-basics
 '

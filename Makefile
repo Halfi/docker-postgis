@@ -62,6 +62,14 @@ GIT=git
 OFFIMG_LOCAL_CLONE=$(HOME)/official-images
 OFFIMG_REPO_URL=https://github.com/docker-library/official-images.git
 
+PLATFORMS="linux/amd64,linux/arm64"
+LATEST_EXTRA_TAG=
+PUSH_BUILDX_DEP=
+ifeq ($(VERSION),$(LATEST_VERSION))
+	LATEST_EXTRA_TAG=-t $(REPO_NAME)/$(IMAGE_NAME):latest
+	PUSH_BUILDX_DEP=push-readme
+endif
+
 
 build: $(foreach version,$(VERSIONS),build-$(version))
 
@@ -133,8 +141,28 @@ endif
 endef
 $(foreach version,$(VERSIONS),$(eval $(call push-version,$(version))))
 
-push-latest: tag-latest $(PUSH_LATEST_DEP)
+### RULES FOR MULTI-ARCH BUILD ###
+
+buildx: $(foreach version,$(VERSIONS),buildx-$(version)) $(PUSH_BUILDX_DEP)
+
+define buildx-version
+buildx-$1:
+	$(DOCKER) buildx create --use
+ifeq ($(do_default),true)
+	$(DOCKER) buildx build --pull --platform $(PLATFORMS) -t $(REPO_NAME)/$(IMAGE_NAME):$(shell echo $1) $(LATEST_EXTRA_TAG) --push $1
+endif
+ifeq ($(do_alpine),true)
+ifneq ("$(wildcard $1/alpine)","")
+	$(DOCKER) buildx build --pull --platform $(PLATFORMS) -t $(REPO_NAME)/$(IMAGE_NAME):$(shell echo $1)-alpine $(LATEST_EXTRA_TAG) --push $1/alpine
+endif
+endif
+endef
+$(foreach version,$(VERSIONS),$(eval $(call buildx-version,$(version))))
+
+push-latest: tag-latest $(PUSH_LATEST_DEP) push-readme
 	$(DOCKER) image push $(REPO_NAME)/$(IMAGE_NAME):latest
+
+push-readme:
 	@$(DOCKER) run -v "$(PWD)":/workspace \
                       -e DOCKERHUB_USERNAME='$(DOCKERHUB_USERNAME)' \
                       -e DOCKERHUB_PASSWORD='$(DOCKERHUB_PASSWORD)' \
@@ -142,7 +170,7 @@ push-latest: tag-latest $(PUSH_LATEST_DEP)
                       -e README_FILEPATH='/workspace/README.md' $(DOCKERHUB_DESC_IMG)
 
 
-.PHONY: build all update test-prepare test tag-latest push push-latest \
+.PHONY: build all update test-prepare test tag-latest push push-latest push-readme \
         $(foreach version,$(VERSIONS),build-$(version)) \
         $(foreach version,$(VERSIONS),test-$(version)) \
         $(foreach version,$(VERSIONS),push-$(version))
